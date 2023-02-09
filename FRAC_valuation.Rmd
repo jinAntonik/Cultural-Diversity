@@ -1,5 +1,5 @@
 ---
-title: "Курсовая работы Гладун Алёны (194) и Алексеева Антона (192)"
+title: "Курсовая работа Алексеева Антона"
 output:
   html_document:
     code_folding: hide
@@ -47,7 +47,7 @@ years = c("2010", "2015")
 # 2. region - столбец, по которому происходит группировка, также используется для обращения к конкретному субъекту РФ
 # 3. region_kolvo - общее количество считаемого для ОДНОГО КОНКРЕТНОГО субъекта РФ
 
-data = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/числ по национальностям по суб РЕДАЧ.xlsx", col_names = T) %>% arrange(region)
+data = read_excel("D:/.../3 курс/курсовая/2010/готовое/числ по национальностям по суб РЕДАЧ.xlsx", col_names = T) %>% arrange(region)
 
 df2010 = data %>% group_by(region) %>% summarise(region_kolvo = sum(num_of_people))
 attributes(df2010$region_kolvo)$label = "Численность населения, используемая при подсчете FRAC_ethnic (техническая)"
@@ -60,7 +60,7 @@ regions = df2010$region %>% sort(decreasing = F)
 ### 2015
 
 ```{r data2}
-data2 = read_excel("D:/HSE/3 курс/курсовая/2015/эк активные.xlsx", col_names = T)
+data2 = read_excel("D:/.../3 курс/курсовая/2015/эк активные.xlsx", col_names = T)
 
 df2015 = data2 %>% select(region, active_share) %>% arrange(region)
 attributes(df2015$active_share)$label = "Доля экономически активного населения"
@@ -72,7 +72,7 @@ rm(data2)
 ### 2002
 
 ```{r data3}
-data0 = read_excel("D:/HSE/3 курс/курсовая/2002/национальность.xls", col_names = T)
+data0 = read_excel("D:/.../3 курс/курсовая/2002/национальность.xls", col_names = T)
 
 df2002 = data0 %>% group_by(region) %>% summarise(region_kolvo = sum(num_of_people)) %>% arrange(region)
 
@@ -153,7 +153,7 @@ rm(data, df_glob_indices, df_glob_indices2)
 
 Для таблицы языков
 ```{r for_FRAC_lang}
-df_full = read_excel("D:/HSE/3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-1.xlsx")
+df_full = read_excel("D:/.../3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-1.xlsx")
 
 langs = seq(2, 83)
 not_lang = c(22, 60, 61)
@@ -161,7 +161,7 @@ clear_list = langs[langs %!in% not_lang]
 
 i = 2
 for (i in clear_list){
-    name = paste0("D:/HSE/3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-", deparse(i+0), ".xlsx")
+    name = paste0("D:/.../3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-", deparse(i+0), ".xlsx")
     df = read_excel(name)
     df_full = rbind(df_full, df)
     rm(df)
@@ -184,8 +184,8 @@ rm(df_full, df_glob_indices, df_glob_indices2)
 
 Для происхождения
 ```{r FRAC_origin}
-data_origin_reg = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "регионы (2)")
-data_origin_country = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "страны (2)")
+data_origin_reg = read_excel("D:/.../3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "регионы (2)")
+data_origin_country = read_excel("D:/.../3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "страны (2)")
 
 dff_reg = pivot_longer(data_origin_reg, cols = -status, values_to = "population" , names_to = "live in")
 colnames(dff_reg) = c("region", "born in", "population") # region - где живут
@@ -218,7 +218,7 @@ rm(data_origin_reg, data_origin_country, dff_reg, dff_country, df_glob_indices, 
 ##### Другие переменные
 
 ```{r root_population}
-data_root = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "для коренного")
+data_root = read_excel("D:/.../3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "для коренного")
 
 df2010 = data_root %>% select(region, root_share) %>% right_join(df2010, by = "region")
 attributes(df2010$root_share)$label = "Доля коренного населения"
@@ -227,7 +227,7 @@ rm(data_root)
 ```
 
 ```{r urban_population}
-df_urban = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/доля городского насел по суб.xlsx", col_names = T)
+df_urban = read_excel("D:/.../3 курс/курсовая/2010/готовое/доля городского насел по суб.xlsx", col_names = T)
 
 df2010 = df_urban %>% select(region, urban_percentage) %>% right_join(df2010, by = "region")
 df2010 = df2010 %>% rename("urban_share" = "urban_percentage")
@@ -237,7 +237,7 @@ rm(df_urban)
 ```
 
 ```{r budget_expenditures}
-df_budget = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/расходы бюджета по суб.xlsx", col_names = T)
+df_budget = read_excel("D:/.../3 курс/курсовая/2010/готовое/расходы бюджета по суб.xlsx", col_names = T)
 
 df2010 = df_budget %>% select(region, all_expenditures) %>% right_join(df2010, by = "region")
 df2010 = df2010 %>% rename("budget" = "all_expenditures")
@@ -248,7 +248,7 @@ rm(df_budget)
 ```
 
 ```{r economically_active}
-df_active = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/трудовые ресы по субъектам.xlsx", col_names = T)
+df_active = read_excel("D:/.../3 курс/курсовая/2010/готовое/трудовые ресы по субъектам.xlsx", col_names = T)
 
 df2010 = df_active %>% select(region, active_share) %>% right_join(df2010, by = "region")
 attributes(df2010$active_share)$label = "Доля экономически активного населения"
@@ -257,7 +257,7 @@ rm(df_active)
 ```
 
 ```{r migration_growth}
-df_migr = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/миграционный прирост.xlsx", col_names = T)
+df_migr = read_excel("D:/.../3 курс/курсовая/2010/готовое/миграционный прирост.xlsx", col_names = T)
 
 df2010 = df_migr %>% select(region, coef_migration_growth) %>% right_join(df2010, by = "region")
 df2010 = df2010 %>% rename("migration_change" = "coef_migration_growth")
@@ -270,8 +270,8 @@ rm(df_migr)
 
 Для происхождения(субъект; страна)
 ```{r FRAC_origin15}
-data_origin_reg15 = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_региону")
-data_origin_country15 = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_стране")
+data_origin_reg15 = read_excel("D:/.../3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_региону")
+data_origin_country15 = read_excel("D:/.../3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_стране")
 
 
 dff_reg15 = pivot_longer(data_origin_reg15, cols = -status, values_to = "population" , names_to = "live in")
@@ -306,7 +306,7 @@ rm(data_origin_reg15, data_origin_country15, dff_reg15, dff_country15, df_glob_i
 
 Для национальности
 ```{r}
-data_nation2015 = read_excel("D:/HSE/3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "национальность") %>% arrange(region)
+data_nation2015 = read_excel("D:/.../3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "национальность") %>% arrange(region)
 
 func_for_frac(data_nation2015, 2015)
 df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
@@ -321,7 +321,7 @@ rm(data_nation2015, df_glob_indices, df_glob_indices2)
 
 Для языков
 ```{r}
-data_lang = read_excel("D:/HSE/3 курс/курсовая/2015/родной язык по суб.xlsx", col_names = T) %>% arrange(region)
+data_lang = read_excel("D:/.../3 курс/курсовая/2015/родной язык по суб.xlsx", col_names = T) %>% arrange(region)
 
 func_for_frac(data_lang, 2015)
 df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
@@ -337,7 +337,7 @@ rm(data_lang, df_glob_indices, df_glob_indices2)
 
 Остальное
 ```{r root_population2015}
-data_root = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "коренное_насел(вместе_с_иностр)")
+data_root = read_excel("D:/.../3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "коренное_насел(вместе_с_иностр)")
 
 df2015 = data_root %>% right_join(df2015, by = "region")
 attributes(df2015$root_share)$label = "Доля коренного населения"
@@ -346,7 +346,7 @@ rm(data_root)
 ```
 
 ```{r urban_population2015}
-data_urban = read_excel("D:/HSE/3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "городское")
+data_urban = read_excel("D:/.../3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "городское")
 
 df2015 = data_urban %>% right_join(df2015, by = "region")
 df2015 = df2015 %>% rename("urban_share" = "urban")
@@ -357,7 +357,7 @@ rm(data_urban)
 
 ```{r budget2015}
 # без бюджета не работает techno_innovations
-df_budget = read_excel("D:/HSE/3 курс/курсовая/2015/расходы бюджета по суб.xlsx", col_names = T, sheet="расходы руб")
+df_budget = read_excel("D:/.../3 курс/курсовая/2015/расходы бюджета по суб.xlsx", col_names = T, sheet="расходы руб")
 
 df2015 = df_budget %>% select(region, budget) %>% right_join(df2015, by = "region")
 df2015$budget = df2015$budget %>% as.numeric()
@@ -367,7 +367,7 @@ rm(df_budget)
 ```
 
 ```{r migration2015}
-data_migr = read_excel("D:/HSE/3 курс/курсовая/2015/миграционный прирост.xlsx", col_names = T)
+data_migr = read_excel("D:/.../3 курс/курсовая/2015/миграционный прирост.xlsx", col_names = T)
 
 df2015 = data_migr %>% right_join(df2015, by = "region")
 attributes(df2015$migration_change)$label = "Миграционный прирост на 10 тыс. чел населения, чел"
@@ -394,8 +394,8 @@ rm(data0, df_glob_indices, df_glob_indices2)
 
 Для происхождения
 ```{r}
-data_origin_reg02 = read_excel("D:/HSE/3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_региону")
-data_origin_country02 = read_excel("D:/HSE/3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_стране")
+data_origin_reg02 = read_excel("D:/.../3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_региону")
+data_origin_country02 = read_excel("D:/.../3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_стране")
 
 
 dff_reg02 = pivot_longer(data_origin_reg02, cols = -status, values_to = "population" , names_to = "live in")
@@ -430,7 +430,7 @@ rm(data_origin_reg02, data_origin_country02, dff_reg02, dff_country02, df_glob_i
 
 Остальное
 ```{r}
-df_resid = read_excel("D:/HSE/3 курс/курсовая/2002/2002 от алены.xlsx", col_names = T, sheet = "загрузка")
+df_resid = read_excel("D:/.../3 курс/курсовая/2002/2002 от алены.xlsx", col_names = T, sheet = "загрузка")
 df2002 = df_resid %>% right_join(df2002, by = "region")
 df2002$budget = df2002$budget*10^6
 
@@ -442,7 +442,7 @@ rm(df_resid)
 
 ВРП
 ```{r GDP_na_dushu}
-df_VRP = read_excel("D:/HSE/3 курс/курсовая/общее/ВРП_на_душу98-19.xlsx", col_names = T)
+df_VRP = read_excel("D:/.../3 курс/курсовая/общее/ВРП_на_душу98-19.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_VRP %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -458,7 +458,7 @@ rm(df_VRP)
 
 Численность населения
 ```{r population}
-df_popul = read_excel("D:/HSE/3 курс/курсовая/общее/численность населения по суб 1991-2019.xlsx", col_names = T)
+df_popul = read_excel("D:/.../3 курс/курсовая/общее/численность населения по суб 1991-2019.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_popul %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -473,7 +473,7 @@ rm(df_popul)
 ```
 
 ```{r square, include=FALSE}
-df_square = read_excel("D:/HSE/3 курс/курсовая/общее/площадь регионов.xlsx", col_names = T)
+df_square = read_excel("D:/.../3 курс/курсовая/общее/площадь регионов.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_square %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -494,7 +494,7 @@ rm(df_square)
 
 Затраты на НИОКР
 ```{r techno_innovations}
-df_tech_innov = read_excel("D:/HSE/3 курс/курсовая/общее/затраты на технологич инновац по суб.xlsx", col_names = T)
+df_tech_innov = read_excel("D:/.../3 курс/курсовая/общее/затраты на технологич инновац по суб.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_tech_innov %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -515,7 +515,7 @@ rm(df_tech_innov)
 
 Затраты в основной капитал
 ```{r osnovnoy_kapital}
-df_osn_kap = read_excel("D:/HSE/3 курс/курсовая/общее/инвест в основной капитал на душу по суб.xlsx", col_names = T)
+df_osn_kap = read_excel("D:/.../3 курс/курсовая/общее/инвест в основной капитал на душу по суб.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_osn_kap %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -531,7 +531,7 @@ rm(df_osn_kap)
 
 Количество научных работников
 ```{r kolvo_of_scientists}
-df_scientists = read_excel("D:/HSE/3 курс/курсовая/общее/численность ученых по суб.xlsx", col_names = T)
+df_scientists = read_excel("D:/.../3 курс/курсовая/общее/численность ученых по суб.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_scientists %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -553,7 +553,7 @@ rm(df_scientists)
 
 Инфляция
 ```{r inflation}
-df_CPI = read_excel("D:/HSE/3 курс/курсовая/общее/ипц по субъектам.xlsx", col_names = T)
+df_CPI = read_excel("D:/.../3 курс/курсовая/общее/ипц по субъектам.xlsx", col_names = T)
 
 if ("2002" %in% years){
   years2 = years[years %!in% c("2002")]
@@ -574,7 +574,7 @@ rm(df_CPI)
 
 Количество лет образования
 ```{r education}
-df_educ = read_excel("D:/HSE/3 курс/курсовая/общее/образование по субъектам.xlsx", col_names = T)
+df_educ = read_excel("D:/.../3 курс/курсовая/общее/образование по субъектам.xlsx", col_names = T)
 
 for (i in years){
   assign(paste0("df",i), df_educ %>% select(region, paste0("higher_educ_share",i), paste0("years_educ",i)) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -596,7 +596,7 @@ rm(df_educ)
 #### Инструменты
 
 ```{r pollution}
-df_pollution = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "загрязнение", col_names = T)
+df_pollution = read_excel("D:/.../3 курс/курсовая/общее/инструменты.xlsx", sheet = "загрязнение", col_names = T)
 
 for (i in c("2002", "2010", "2015")){
   assign(paste0("df",i), df_pollution %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -611,7 +611,7 @@ rm(df_pollution)
 ```
 
 ```{r roads}
-df_roads = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "плотность дорог", col_names = T)
+df_roads = read_excel("D:/.../3 курс/курсовая/общее/инструменты.xlsx", sheet = "плотность дорог", col_names = T)
 
 for (i in c("2002", "2010", "2015")){
   assign(paste0("df",i), df_roads %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -626,7 +626,7 @@ rm(df_roads)
 ```
 
 ```{r house}
-df_house = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "цена жилья", col_names = T)
+df_house = read_excel("D:/.../3 курс/курсовая/общее/инструменты.xlsx", sheet = "цена жилья", col_names = T)
 
 for (i in c("2002", "2010", "2015")){
   assign(paste0("df",i), df_house %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
@@ -819,49 +819,49 @@ df_full$scientists_share = df_full$scientists_share %>% str_replace_all(",", "."
 ```
 
 ```{r final_export}
-write_excel_csv2(df_full, "D:/HSE/3 курс/курсовая/final_df.csv", col_names = TRUE)
-foreign::write.dta(df_full, "D:/HSE/3 курс/курсовая/final_df.dta")
+write_excel_csv2(df_full, "D:/.../3 курс/курсовая/final_df.csv", col_names = TRUE)
+foreign::write.dta(df_full, "D:/.../3 курс/курсовая/final_df.dta")
 ```
 
 ```{r year-dfs}
 df_02 = df_full %>% filter(year == 2002)
-foreign::write.dta(df_02, "D:/HSE/3 курс/курсовая/df_02.dta")
+foreign::write.dta(df_02, "D:/.../3 курс/курсовая/df_02.dta")
 
 df_10 = df_full %>% filter(year == 2010)
-foreign::write.dta(df_10, "D:/HSE/3 курс/курсовая/df_10.dta")
+foreign::write.dta(df_10, "D:/.../3 курс/курсовая/df_10.dta")
 
 df_15 = df_full %>% filter(year == 2015)
-foreign::write.dta(df_15, "D:/HSE/3 курс/курсовая/df_15.dta")
+foreign::write.dta(df_15, "D:/.../3 курс/курсовая/df_15.dta")
 
 
 df_02_10 = df_full %>% filter(year %in% c(2002, 2010))
-foreign::write.dta(df_02_10, "D:/HSE/3 курс/курсовая/df_02_10.dta")
+foreign::write.dta(df_02_10, "D:/.../3 курс/курсовая/df_02_10.dta")
 
 df_10_15 = df_full %>% filter(year %in% c(2010, 2015))
-foreign::write.dta(df_10_15, "D:/HSE/3 курс/курсовая/df_10_15.dta")
+foreign::write.dta(df_10_15, "D:/.../3 курс/курсовая/df_10_15.dta")
 ```
 
 ```{r bez_gorodov}
-foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург"), "D:/HSE/3 курс/курсовая/final_dfbez.dta")
+foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург"), "D:/.../3 курс/курсовая/final_dfbez.dta")
 
 df_02bez = df_full %>% filter(year == 2002) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
-foreign::write.dta(df_02bez, "D:/HSE/3 курс/курсовая/df_02bez.dta")
+foreign::write.dta(df_02bez, "D:/.../3 курс/курсовая/df_02bez.dta")
 
 df_10bez = df_full %>% filter(year == 2010) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
-foreign::write.dta(df_10bez, "D:/HSE/3 курс/курсовая/df_10bez.dta")
+foreign::write.dta(df_10bez, "D:/.../3 курс/курсовая/df_10bez.dta")
 
 df_15bez = df_full %>% filter(year == 2015) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
-foreign::write.dta(df_15bez, "D:/HSE/3 курс/курсовая/df_15bez.dta")
+foreign::write.dta(df_15bez, "D:/.../3 курс/курсовая/df_15bez.dta")
 
 
 df_02_10bez = df_full %>% filter(year %in% c(2002, 2010)) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
-foreign::write.dta(df_02_10bez, "D:/HSE/3 курс/курсовая/df_02_10bez.dta")
+foreign::write.dta(df_02_10bez, "D:/.../3 курс/курсовая/df_02_10bez.dta")
 
 df_10_15bez = df_full %>% filter(year %in% c(2010, 2015)) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
-foreign::write.dta(df_10_15bez, "D:/HSE/3 курс/курсовая/df_10_15bez.dta")
+foreign::write.dta(df_10_15bez, "D:/.../3 курс/курсовая/df_10_15bez.dta")
 
 # для инструментов
-foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург" & region != "Еврейская автономная область" & region != "Чукотский автономный округ"), "D:/HSE/3 курс/курсовая/final_df_instr.dta")
+foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург" & region != "Еврейская автономная область" & region != "Чукотский автономный округ"), "D:/.../3 курс/курсовая/final_df_instr.dta")
 ```
 
 
@@ -1081,7 +1081,7 @@ theme_adv = theme(plot.title = element_text(hjust = 0.5, size = 12),
 ```{r graph}
 # запускать весь чанк!
 wwidth = 900
-graph_path = "D:/HSE/3 курс/курсовая/графики/"
+graph_path = "D:/.../3 курс/курсовая/графики/"
 
 png(filename=paste0(graph_path,"frac_pol_2015.png"), units = "px", width=wwidth, height=wwidth/(16/9))
 
@@ -1096,7 +1096,5 @@ ggplot(df_indices15)+
 
 dev.off()
 
-# Альтернативный вариант (плохо работает)
-# ggsave(file="bench_query_sort.pdf", path = "D:/HSE/3 курс/курсовая/графики/", units = "px", width=wwidth, height=wwidth/(16/9), scale = 3, dpi=100)
 ```
 
