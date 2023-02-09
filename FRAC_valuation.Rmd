@@ -1,0 +1,1102 @@
+---
+title: "Курсовая работы Гладун Алёны (194) и Алексеева Антона (192)"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, eval=FALSE)
+```
+
+```{r keyboard_shortcuts, include=FALSE}
+# Alt+L - свернуть чанк
+# Alt+0 - свернуть все чанки
+# Alt+Shift+L - развернуть чанк
+# Alt+Shift+0 - развернуть все чанки
+# 
+# Ctrl+Shift+Enter - запустить чанк
+```
+
+```{r library, include=FALSE}
+library(tidyverse) # dplyr, ggplot2
+library(readxl) # открытие файлов .xlsx
+library(readr)
+library(stringr)
+library(extrafont)
+library(psych) # таблица описательных статистик
+
+library(xtable) # перенос таблиц в Latex
+library(lmtest) # регрессии
+library(plm) # панельные данные
+library(sandwich) # для матрицы Уайта в панельных данных
+
+options(scipen=999)
+`%!in%` <- Negate(`%in%`)
+years = c("2010", "2015")
+```
+
+
+### 2010
+
+```{r data}
+# 1. data - большой датафрейм со всеми данными, "длинная" таблица
+# 2. region - столбец, по которому происходит группировка, также используется для обращения к конкретному субъекту РФ
+# 3. region_kolvo - общее количество считаемого для ОДНОГО КОНКРЕТНОГО субъекта РФ
+
+data = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/числ по национальностям по суб РЕДАЧ.xlsx", col_names = T) %>% arrange(region)
+
+df2010 = data %>% group_by(region) %>% summarise(region_kolvo = sum(num_of_people))
+attributes(df2010$region_kolvo)$label = "Численность населения, используемая при подсчете FRAC_ethnic (техническая)"
+
+df2010 = df2010 %>% filter(region != "Ненецкий автономный округ" & region != "Ямало-Ненецкий автономный округ" & region != "Ханты-Мансийский автономный округ - Югра")
+
+regions = df2010$region %>% sort(decreasing = F)
+```
+
+### 2015
+
+```{r data2}
+data2 = read_excel("D:/HSE/3 курс/курсовая/2015/эк активные.xlsx", col_names = T)
+
+df2015 = data2 %>% select(region, active_share) %>% arrange(region)
+attributes(df2015$active_share)$label = "Доля экономически активного населения"
+
+df2015 = df2015 %>% filter(region != "Ненецкий автономный округ" & region != "Ямало-Ненецкий автономный округ" & region != "Ханты-Мансийский автономный округ - Югра" & region != "Тюменская область без АО" & region != "Архангельская область без АО"& region != "Тюменская область без АО" & region != "Архангельская область без АО"& region != "Республика Крым" & region != "г. Севастополь")
+rm(data2)
+```
+
+### 2002
+
+```{r data3}
+data0 = read_excel("D:/HSE/3 курс/курсовая/2002/национальность.xls", col_names = T)
+
+df2002 = data0 %>% group_by(region) %>% summarise(region_kolvo = sum(num_of_people)) %>% arrange(region)
+
+df2002 = df2002 %>% filter(region != "Ненецкий автономный округ" & region != "Ямало-Ненецкий автономный округ" & region != "Ханты-Мансийский автономный округ - Югра")
+df2002 = df2002 %>% select(region)
+```
+
+
+**=======================================**
+
+**Фракционализация**
+
+```{r function_for_frac}
+func_for_frac = function(df_big, year){
+  indices = c()
+  reggions = c()
+  for (i in seq(1, dim(eval(parse(text=paste0("df", year))))[1])){
+    data_reg = df_big %>% filter(region == regions[i]) # создаем дф для всех групп одного региона
+    all_popul = sum(data_reg[[3]])
+    data_reg$share = NaN
+    s_reg = 1 # счетчик
+    for (narod in data_reg[[3]]){ # цикл расчета долей групп в регионе
+      share = narod / all_popul
+      data_reg$share[s_reg] = share
+      s_reg = s_reg + 1
+    }
+    data_reg = data_reg %>% mutate(sq = share^2)
+    frac = 1 - sum(data_reg$sq)
+    indices = c(indices, frac)
+    reggions = c(reggions, regions[i])
+  }
+  df_glob_indices <<- data.frame(region = reggions, index = indices)
+}
+```
+
+**Поляризация**
+
+```{r function_for_POL}
+func_for_pol = function(df_big, year){
+  indices = c()
+  reggions = c()
+  for (i in seq(1, dim(eval(parse(text=paste0("df", year))))[1])){
+    data_reg = df_big %>% filter(region == regions[i])
+    all_popul = sum(data_reg[[3]])
+    data_reg$share = NaN
+    s_reg = 1
+    for (narod in data_reg[[3]]){
+      share = narod / all_popul
+      data_reg$share[s_reg] = share
+      s_reg = s_reg + 1
+    }
+    data_reg = data_reg %>% mutate(act = share*((0.5-share)/0.5)^2)
+    frac = 1 - sum(data_reg$act)
+    indices = c(indices, frac)
+    reggions = c(reggions, regions[i])
+  }
+  df_glob_indices2 <<- data.frame(region = reggions, indexx = indices)
+}
+```
+
+**=======================================**
+
+### Только для 2010
+
+Для национальностей
+```{r FRAC&POL_ethnic}
+func_for_frac(data, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices, by = "region")
+df2010 = df2010 %>% rename("FRAC_ethnic" = "index")
+
+func_for_pol(data, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices2, by = "region")
+df2010 = df2010 %>% rename("POL_ethnic" = "indexx")
+
+df2010 = df2010 %>% select(-c(region_kolvo))
+rm(data, df_glob_indices, df_glob_indices2)
+```
+
+Для таблицы языков
+```{r for_FRAC_lang}
+df_full = read_excel("D:/HSE/3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-1.xlsx")
+
+langs = seq(2, 83)
+not_lang = c(22, 60, 61)
+clear_list = langs[langs %!in% not_lang]
+
+i = 2
+for (i in clear_list){
+    name = paste0("D:/HSE/3 курс/курсовая/2010/сто таблиц про языки/Pub-04-09-", deparse(i+0), ".xlsx")
+    df = read_excel(name)
+    df_full = rbind(df_full, df)
+    rm(df)
+}
+
+rm(name, clear_list, langs, not_lang)
+```
+
+```{r FRAC_lang}
+func_for_frac(df_full, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices, by = "region")
+df2010 = df2010 %>% rename("FRAC_lang" = "index")
+
+func_for_pol(df_full, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices2, by = "region")
+df2010 = df2010 %>% rename("POL_lang" = "indexx")
+
+rm(df_full, df_glob_indices, df_glob_indices2)
+```
+
+Для происхождения
+```{r FRAC_origin}
+data_origin_reg = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "регионы (2)")
+data_origin_country = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "страны (2)")
+
+dff_reg = pivot_longer(data_origin_reg, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_reg) = c("region", "born in", "population") # region - где живут
+
+dff_country = pivot_longer(data_origin_country, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_country) = c("region", "born in", "population")
+```
+
+```{r FRAC_origin2}
+func_for_frac(dff_reg, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices, by = "region")
+df2010 = df2010 %>% rename("FRAC_origin_reg" = "index")
+
+func_for_frac(dff_country, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices, by = "region")
+df2010 = df2010 %>% rename("FRAC_origin_country" = "index")
+
+func_for_pol(dff_reg, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices2, by = "region")
+df2010 = df2010 %>% rename("POL_origin_reg" = "indexx")
+
+func_for_pol(dff_country, 2010)
+df2010 = df2010 %>% left_join(df_glob_indices2, by = "region")
+df2010 = df2010 %>% rename("POL_origin_country" = "indexx")
+
+
+rm(data_origin_reg, data_origin_country, dff_reg, dff_country, df_glob_indices, df_glob_indices2)
+```
+
+##### Другие переменные
+
+```{r root_population}
+data_root = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/регионы и страны происхождения по суб.xlsx", col_names = T, sheet = "для коренного")
+
+df2010 = data_root %>% select(region, root_share) %>% right_join(df2010, by = "region")
+attributes(df2010$root_share)$label = "Доля коренного населения"
+
+rm(data_root)
+```
+
+```{r urban_population}
+df_urban = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/доля городского насел по суб.xlsx", col_names = T)
+
+df2010 = df_urban %>% select(region, urban_percentage) %>% right_join(df2010, by = "region")
+df2010 = df2010 %>% rename("urban_share" = "urban_percentage")
+attributes(df2010$urban_share)$label = "Доля городского населения"
+
+rm(df_urban)
+```
+
+```{r budget_expenditures}
+df_budget = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/расходы бюджета по суб.xlsx", col_names = T)
+
+df2010 = df_budget %>% select(region, all_expenditures) %>% right_join(df2010, by = "region")
+df2010 = df2010 %>% rename("budget" = "all_expenditures")
+df2010$budget = df2010$budget*10^6
+attributes(df2010$budget)$label = "Расходы бюджета всего, руб (номин)"
+
+rm(df_budget)
+```
+
+```{r economically_active}
+df_active = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/трудовые ресы по субъектам.xlsx", col_names = T)
+
+df2010 = df_active %>% select(region, active_share) %>% right_join(df2010, by = "region")
+attributes(df2010$active_share)$label = "Доля экономически активного населения"
+
+rm(df_active)
+```
+
+```{r migration_growth}
+df_migr = read_excel("D:/HSE/3 курс/курсовая/2010/готовое/миграционный прирост.xlsx", col_names = T)
+
+df2010 = df_migr %>% select(region, coef_migration_growth) %>% right_join(df2010, by = "region")
+df2010 = df2010 %>% rename("migration_change" = "coef_migration_growth")
+attributes(df2010$migration_change)$label = "Миграционный прирост на 10 тыс. чел населения, чел"
+
+rm(df_migr)
+```
+
+### Только для 2015
+
+Для происхождения(субъект; страна)
+```{r FRAC_origin15}
+data_origin_reg15 = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_региону")
+data_origin_country15 = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "по_стране")
+
+
+dff_reg15 = pivot_longer(data_origin_reg15, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_reg15) = c("region", "born in", "population") # region - где живут
+dff_reg15 = dff_reg15 %>% arrange(region)
+
+dff_country15 = pivot_longer(data_origin_country15, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_country15) = c("region", "born in", "population")
+dff_country15 = dff_country15 %>% arrange(region)
+```
+
+```{r FRAC_origin2_15}
+func_for_frac(dff_reg15, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
+df2015 = df2015 %>% rename("FRAC_origin_reg" = "index")
+
+func_for_frac(dff_country15, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
+df2015 = df2015 %>% rename("FRAC_origin_country" = "index")
+
+func_for_pol(dff_reg15, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices2, by = "region")
+df2015 = df2015 %>% rename("POL_origin_reg" = "indexx")
+
+func_for_pol(dff_country15, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices2, by = "region")
+df2015 = df2015 %>% rename("POL_origin_country" = "indexx")
+
+
+rm(data_origin_reg15, data_origin_country15, dff_reg15, dff_country15, df_glob_indices, df_glob_indices2)
+```
+
+Для национальности
+```{r}
+data_nation2015 = read_excel("D:/HSE/3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "национальность") %>% arrange(region)
+
+func_for_frac(data_nation2015, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
+df2015 = df2015 %>% rename("FRAC_ethnic" = "index")
+
+func_for_pol(data_nation2015, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices2, by = "region")
+df2015 = df2015 %>% rename("POL_ethnic" = "indexx")
+
+rm(data_nation2015, df_glob_indices, df_glob_indices2)
+```
+
+Для языков
+```{r}
+data_lang = read_excel("D:/HSE/3 курс/курсовая/2015/родной язык по суб.xlsx", col_names = T) %>% arrange(region)
+
+func_for_frac(data_lang, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices, by = "region")
+df2015 = df2015 %>% rename("FRAC_lang" = "index")
+
+func_for_pol(data_lang, 2015)
+df2015 = df2015 %>% left_join(df_glob_indices2, by = "region")
+df2015 = df2015 %>% rename("POL_lang" = "indexx")
+
+rm(data_lang, df_glob_indices, df_glob_indices2)
+```
+
+
+Остальное
+```{r root_population2015}
+data_root = read_excel("D:/HSE/3 курс/курсовая/2015/происхождение+коренное.xlsx", col_names = T, sheet = "коренное_насел(вместе_с_иностр)")
+
+df2015 = data_root %>% right_join(df2015, by = "region")
+attributes(df2015$root_share)$label = "Доля коренного населения"
+
+rm(data_root)
+```
+
+```{r urban_population2015}
+data_urban = read_excel("D:/HSE/3 курс/курсовая/2015/национальность по суб+городское.xlsx", col_names = T, sheet = "городское")
+
+df2015 = data_urban %>% right_join(df2015, by = "region")
+df2015 = df2015 %>% rename("urban_share" = "urban")
+attributes(df2015$urban_share)$label = "Доля городского населения"
+
+rm(data_urban)
+```
+
+```{r budget2015}
+# без бюджета не работает techno_innovations
+df_budget = read_excel("D:/HSE/3 курс/курсовая/2015/расходы бюджета по суб.xlsx", col_names = T, sheet="расходы руб")
+
+df2015 = df_budget %>% select(region, budget) %>% right_join(df2015, by = "region")
+df2015$budget = df2015$budget %>% as.numeric()
+attributes(df2015$budget)$label = "Расходы бюджета всего, руб (номин)"
+
+rm(df_budget)
+```
+
+```{r migration2015}
+data_migr = read_excel("D:/HSE/3 курс/курсовая/2015/миграционный прирост.xlsx", col_names = T)
+
+df2015 = data_migr %>% right_join(df2015, by = "region")
+attributes(df2015$migration_change)$label = "Миграционный прирост на 10 тыс. чел населения, чел"
+
+rm(data_migr)
+```
+
+
+
+### Только для 2002
+
+Для национальности
+```{r}
+func_for_frac(data0, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices, by = "region")
+df2002 = df2002 %>% rename("FRAC_ethnic" = "index")
+
+func_for_pol(data0, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices2, by = "region")
+df2002 = df2002 %>% rename("POL_ethnic" = "indexx")
+
+rm(data0, df_glob_indices, df_glob_indices2)
+```
+
+Для происхождения
+```{r}
+data_origin_reg02 = read_excel("D:/HSE/3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_региону")
+data_origin_country02 = read_excel("D:/HSE/3 курс/курсовая/2002/происхождение+коренное.xls", col_names = T, sheet = "по_стране")
+
+
+dff_reg02 = pivot_longer(data_origin_reg02, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_reg02) = c("region", "born in", "population") # region - где живут
+dff_reg02 = dff_reg02 %>% arrange(region)
+
+dff_country02 = pivot_longer(data_origin_country02, cols = -status, values_to = "population" , names_to = "live in")
+colnames(dff_country02) = c("region", "born in", "population")
+dff_country02 = dff_country02 %>% arrange(region)
+```
+
+```{r}
+func_for_frac(dff_reg02, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices, by = "region")
+df2002 = df2002 %>% rename("FRAC_origin_reg" = "index")
+
+func_for_frac(dff_country02, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices, by = "region")
+df2002 = df2002 %>% rename("FRAC_origin_country" = "index")
+
+func_for_pol(dff_reg02, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices2, by = "region")
+df2002 = df2002 %>% rename("POL_origin_reg" = "indexx")
+
+func_for_pol(dff_country02, 2002)
+df2002 = df2002 %>% left_join(df_glob_indices2, by = "region")
+df2002 = df2002 %>% rename("POL_origin_country" = "indexx")
+
+
+rm(data_origin_reg02, data_origin_country02, dff_reg02, dff_country02, df_glob_indices, df_glob_indices2)
+```
+
+Остальное
+```{r}
+df_resid = read_excel("D:/HSE/3 курс/курсовая/2002/2002 от алены.xlsx", col_names = T, sheet = "загрузка")
+df2002 = df_resid %>% right_join(df2002, by = "region")
+df2002$budget = df2002$budget*10^6
+
+rm(df_resid)
+```
+
+
+### Общее
+
+ВРП
+```{r GDP_na_dushu}
+df_VRP = read_excel("D:/HSE/3 курс/курсовая/общее/ВРП_на_душу98-19.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_VRP %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("GDP_region" = i))
+}
+
+# attributes(df2002$GDP_region)$label = "ВРП на душу населения, руб (номин)"
+attributes(df2010$GDP_region)$label = "ВРП на душу населения, руб (номин)"
+attributes(df2015$GDP_region)$label = "ВРП на душу населения, руб (номин)"
+
+rm(df_VRP)
+```
+
+Численность населения
+```{r population}
+df_popul = read_excel("D:/HSE/3 курс/курсовая/общее/численность населения по суб 1991-2019.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_popul %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("population" = i))
+}
+
+# attributes(df2002$population)$label = "Численность населения, чел"
+attributes(df2010$population)$label = "Численность населения, чел"
+attributes(df2015$population)$label = "Численность населения, чел"
+
+rm(df_popul)
+```
+
+```{r square, include=FALSE}
+df_square = read_excel("D:/HSE/3 курс/курсовая/общее/площадь регионов.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_square %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("square" = i))
+  assign(paste0("df", i), eval(parse(text = paste0("df",i))) %>% mutate(density = population / (1000*square)))
+}
+
+# attributes(df2002$square)$label = "Площадь, тыс. км2"
+attributes(df2010$square)$label = "Площадь, тыс. км2"
+attributes(df2015$square)$label = "Площадь, тыс. км2"
+
+# attributes(df2002$density)$label = "Плотность населения, чел/км2"
+attributes(df2010$density)$label = "Плотность населения, чел/км2"
+attributes(df2015$density)$label = "Плотность населения, чел/км2"
+
+rm(df_square)
+```
+
+Затраты на НИОКР
+```{r techno_innovations}
+df_tech_innov = read_excel("D:/HSE/3 курс/курсовая/общее/затраты на технологич инновац по суб.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_tech_innov %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("tech_innov" = i))
+  assign(paste0("df", i), eval(parse(text = paste0("df",i))) %>% mutate(tech_share = (tech_innov*10^6) / budget))
+}
+
+# attributes(df2002$tech_innov)$label = "Затраты на технологические инновации, млн руб (номин)"
+attributes(df2010$tech_innov)$label = "Затраты на технологические инновации, млн руб (номин)"
+attributes(df2015$tech_innov)$label = "Затраты на технологические инновации, млн руб (номин)"
+
+# attributes(df2002$tech_share)$label = "Доля затрат бюджета на технологические инновации"
+attributes(df2010$tech_share)$label = "Доля затрат бюджета на технологические инновации"
+attributes(df2015$tech_share)$label = "Доля затрат бюджета на технологические инновации"
+
+rm(df_tech_innov)
+```
+
+Затраты в основной капитал
+```{r osnovnoy_kapital}
+df_osn_kap = read_excel("D:/HSE/3 курс/курсовая/общее/инвест в основной капитал на душу по суб.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_osn_kap %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("osn_kapital_dusha" = i))
+}
+
+# attributes(df2002$osn_kapital_dusha)$label = "Инвестиции в основной капитал на душу населения, руб (номин)"
+attributes(df2010$osn_kapital_dusha)$label = "Инвестиции в основной капитал на душу населения, руб (номин)"
+attributes(df2015$osn_kapital_dusha)$label = "Инвестиции в основной капитал на душу населения, руб (номин)"
+
+rm(df_osn_kap)
+```
+
+Количество научных работников
+```{r kolvo_of_scientists}
+df_scientists = read_excel("D:/HSE/3 курс/курсовая/общее/численность ученых по суб.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_scientists %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("scientists" = i))
+  assign(paste0("df", i), eval(parse(text = paste0("df",i))) %>% mutate(scientists_share = scientists / population))
+}
+
+# attributes(df2002$scientists)$label = "Численность персонала, занятого научными исследованиями и разработками"
+attributes(df2010$scientists)$label = "Численность персонала, занятого научными исследованиями и разработками, чел"
+attributes(df2015$scientists)$label = "Численность персонала, занятого научными исследованиями и разработками"
+
+
+# attributes(df2002$scientists_share)$label = "Доля населения, занятого научными исследованиями и разработками"
+attributes(df2010$scientists_share)$label = "Доля населения, занятого научными исследованиями и разработками"
+attributes(df2015$scientists_share)$label = "Доля населения, занятого научными исследованиями и разработками"
+
+rm(df_scientists)
+```
+
+Инфляция
+```{r inflation}
+df_CPI = read_excel("D:/HSE/3 курс/курсовая/общее/ипц по субъектам.xlsx", col_names = T)
+
+if ("2002" %in% years){
+  years2 = years[years %!in% c("2002")]
+} else {
+  years2 = years
+}
+
+for (i in years2){
+  assign(paste0("df",i), df_CPI %>% select(region, paste0("for",i,"_to2002")) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("inflation" = paste0("for",i,"_to2002")))
+}
+
+attributes(df2010$inflation)$label = "Уровень цен по ИПЦ по отношению к 2002 году"
+attributes(df2015$inflation)$label = "Уровень цен по ИПЦ по отношению к 2002 году"
+
+rm(df_CPI)
+```
+
+Количество лет образования
+```{r education}
+df_educ = read_excel("D:/HSE/3 курс/курсовая/общее/образование по субъектам.xlsx", col_names = T)
+
+for (i in years){
+  assign(paste0("df",i), df_educ %>% select(region, paste0("higher_educ_share",i), paste0("years_educ",i)) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("higher_educ_share" = paste0("higher_educ_share",i)) %>% rename("years_educ" = paste0("years_educ",i)))
+}
+
+# attributes(df2002$higher_educ_share)$label = "Доля населения с высшим образованием"
+attributes(df2010$higher_educ_share)$label = "Доля населения с высшим образованием"
+attributes(df2015$higher_educ_share)$label = "Доля населения с высшим образованием"
+
+# attributes(df2002$years_educ)$label = "Среднее кол-во лет, потраченное на образование"
+attributes(df2010$years_educ)$label = "Среднее кол-во лет, потраченное на образование"
+attributes(df2015$years_educ)$label = "Среднее кол-во лет, потраченное на образование"
+
+rm(df_educ)
+```
+
+
+#### Инструменты
+
+```{r pollution}
+df_pollution = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "загрязнение", col_names = T)
+
+for (i in c("2002", "2010", "2015")){
+  assign(paste0("df",i), df_pollution %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("instr_pollution" = i))
+}
+
+attributes(df2002$instr_pollution)$label = "Выбросы загрязняющих в-в, тыс. тонн"
+attributes(df2010$instr_pollution)$label = "Выбросы загрязняющих в-в, тыс. тонн"
+attributes(df2015$instr_pollution)$label = "Выбросы загрязняющих в-в, тыс. тонн"
+
+rm(df_pollution)
+```
+
+```{r roads}
+df_roads = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "плотность дорог", col_names = T)
+
+for (i in c("2002", "2010", "2015")){
+  assign(paste0("df",i), df_roads %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("instr_roads" = i))
+}
+
+attributes(df2002$instr_roads)$label = "Плотность а/м асфальтированных дорог на 1000 км2 площади"
+attributes(df2010$instr_roads)$label = "Плотность а/м асфальтированных дорог на 1000 км2 площади"
+attributes(df2015$instr_roads)$label = "Плотность а/м асфальтированных дорог на 1000 км2 площади"
+
+rm(df_roads)
+```
+
+```{r house}
+df_house = read_excel("D:/HSE/3 курс/курсовая/общее/инструменты.xlsx", sheet = "цена жилья", col_names = T)
+
+for (i in c("2002", "2010", "2015")){
+  assign(paste0("df",i), df_house %>% select(region, i) %>% right_join(eval(parse(text = paste0("df",i))), by = "region"))
+  assign(paste0("df",i), eval(parse(text = paste0("df",i))) %>% rename("instr_house" = i))
+}
+
+attributes(df2002$instr_house)$label = "Цена жилья на вторичном рынке, руб/м2"
+attributes(df2010$instr_house)$label = "Цена жилья на вторичном рынке, руб/м2"
+attributes(df2015$instr_house)$label = "Цена жилья на вторичном рынке, руб/м2"
+
+rm(df_house)
+```
+
+
+```{r skolko NA}
+sapply(df2010, function(x) sum(length(which(is.na(x)))))
+# df2010[["region"]][c(which(is.na(df2010$tech_innov)))]
+
+# lapply(df2015, function(x) df2015[["region"]][c(which(is.na(x)))]) # у каких регионов есть NA
+colnames(df2010)[colnames(df2010) %!in% colnames(df2002)]
+df2010$region[df2010$region %!in% df2015$region]
+```
+
+
+
+#### Предобработка
+
+```{r types_2002}
+df2002$higher_educ_share = df2002$higher_educ_share %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$years_educ = df2002$years_educ %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$scientists = df2002$scientists %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$osn_kapital_dusha = df2002$osn_kapital_dusha %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$tech_innov = df2002$tech_innov %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$square = df2002$square %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$GDP_region = df2002$GDP_region %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$migration_change = df2002$migration_change %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$budget = df2002$budget %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$urban_share = df2002$urban_share %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$scientists_share = df2002$scientists_share %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$root_share = df2002$root_share %>% str_replace_all(",", ".") %>% as.numeric()
+```
+
+##### Добавляем переменную бюджет/ВРП
+```{r budget/GRP}
+df2002 = df2002 %>% mutate(budget_share = budget*10^6 / (GDP_region*population))
+attributes(df2002$budget_share)$label = "Доля затрат бюджета от ВРП"
+
+df2010 = df2010 %>% mutate(budget_share = budget / (GDP_region*population))
+attributes(df2010$budget_share)$label = "Доля затрат бюджета от ВРП"
+
+df2015 = df2015 %>% mutate(budget_share = budget / (GDP_region*population))
+attributes(df2015$budget_share)$label = "Доля затрат бюджета от ВРП"
+```
+
+##### Добавляем переменную затраты на НИОКР/население
+```{r tech/popul}
+df2002 = df2002 %>% mutate(tech_share_popul = tech_innov*10^6 / population)
+attributes(df2002$tech_share_popul)$label = "Затраты на технологические инновации на душу населения, руб (реал)"
+
+df2010 = df2010 %>% mutate(tech_share_popul = tech_innov*10^6 / (population*inflation))
+attributes(df2010$tech_share_popul)$label = "Затраты на технологические инновации на душу населения, руб (реал)"
+
+df2015 = df2015 %>% mutate(tech_share_popul = tech_innov*10^6 / (population*inflation))
+attributes(df2015$tech_share_popul)$label = "Затраты на технологические инновации на душу населения, руб (реал)"
+```
+
+```{r instruments}
+df2002$instr_pollution = df2002$instr_pollution %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$instr_roads = df2002$instr_roads %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$instr_house = df2002$instr_house %>% str_replace_all(",", ".") %>% as.numeric()
+df2002$instr_house = df2002$instr_house / 1
+
+df2010$instr_pollution = df2010$instr_pollution %>% str_replace_all(",", ".") %>% as.numeric()
+df2010$instr_roads = df2010$instr_roads %>% str_replace_all(",", ".") %>% as.numeric()
+df2010$instr_house = df2010$instr_house %>% str_replace_all(",", ".") %>% as.numeric()
+df2010$instr_house = df2010$instr_house / df2010$inflation
+
+df2015$instr_pollution = df2015$instr_pollution %>% str_replace_all(",", ".") %>% as.numeric()
+df2015$instr_roads = df2015$instr_roads %>% str_replace_all(",", ".") %>% as.numeric()
+df2015$instr_house = df2015$instr_house %>% str_replace_all(",", ".") %>% as.numeric()
+df2015$instr_house = df2015$instr_house / df2015$inflation
+```
+
+
+##### Удаляем ненужные переменные
+```{r out_excess_columns02}
+DF2002 = df2002 %>% select(-c(scientists, tech_innov, budget, population, square))
+DF2002 = DF2002 %>% mutate(real_osn_kapital = osn_kapital_dusha)
+attributes(DF2002$real_osn_kapital)$label = "Инвестиции в основной капитал на душу населения, руб (реал)"
+
+DF2002 = DF2002 %>% mutate(real_GRP = GDP_region)
+attributes(DF2002$real_GRP)$label = "ВРП на душу населения, руб (реал)"
+
+DF2002$real_GRP = DF2002$real_GRP %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$density = DF2002$density %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$real_osn_kapital = DF2002$real_osn_kapital %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$migration_change = DF2002$migration_change %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$higher_educ_share = DF2002$higher_educ_share %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$years_educ = DF2002$years_educ %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$urban_share = DF2002$urban_share %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$root_share = DF2002$root_share %>% str_replace_all(",", ".") %>% as.numeric()
+DF2002$scientists_share = DF2002$scientists_share %>% str_replace_all(",", ".") %>% as.numeric()
+
+DF2002$year = rep(2002, times=80)
+DF2002 = DF2002 %>% select(-c(osn_kapital_dusha, GDP_region))
+# rm(df2002)
+```
+
+```{r out_excess_columns10}
+DF2010 = df2010 %>% select(-c(scientists, tech_innov, budget, population, square))
+DF2010 = DF2010 %>% mutate(real_osn_kapital = osn_kapital_dusha/inflation)
+attributes(DF2010$real_osn_kapital)$label = "Инвестиции в основной капитал на душу населения, руб (реал)"
+
+DF2010 = DF2010 %>% mutate(real_GRP = GDP_region/inflation)
+attributes(DF2010$real_GRP)$label = "ВРП на душу населения, руб (реал)"
+
+DF2010$year = rep(2010, times=80)
+DF2010 = DF2010 %>% select(-c(osn_kapital_dusha, GDP_region, inflation))
+# rm(df2010)
+```
+
+```{r out_excess_columns15}
+DF2015 = df2015 %>% select(-c(scientists, tech_innov, budget, population, square))
+DF2015 = DF2015 %>% mutate(real_osn_kapital = osn_kapital_dusha/inflation)
+attributes(DF2015$real_osn_kapital)$label = "Инвестиции в основной капитал на душу населения, руб (реал)"
+
+DF2015 = DF2015 %>% mutate(real_GRP = GDP_region/inflation)
+attributes(DF2015$real_GRP)$label = "ВРП на душу населения, руб (реал)"
+
+DF2015$year = rep(2015, times=80)
+DF2015 = DF2015 %>% select(-c(osn_kapital_dusha, GDP_region, inflation))
+# rm(df2015)
+```
+
+##### Объединяем кросс-секции
+```{r unite}
+DF2002 = DF2002 %>% filter(region != "Чеченская Республика") %>% filter(region != "Республика Ингушетия")
+DF2010 = DF2010 %>% filter(region != "Чеченская Республика") %>% filter(region != "Республика Ингушетия")
+DF2015 = DF2015 %>% filter(region != "Чеченская Республика") %>% filter(region != "Республика Ингушетия")
+
+DF2002$log_GRP = log(DF2002$real_GRP)
+DF2010$log_GRP = log(DF2010$real_GRP)
+DF2015$log_GRP = log(DF2015$real_GRP)
+
+# сортируем, чтобы присвоить id регионам (необходимо для Stata)
+DF2002 = DF2002 %>% arrange(region)
+DF2010 = DF2010 %>% arrange(region)
+DF2015 = DF2015 %>% arrange(region)
+
+DF2002$id = rownames(DF2002) %>% as.numeric()
+DF2010$id = rownames(DF2010) %>% as.numeric()
+DF2015$id = rownames(DF2015) %>% as.numeric()
+```
+
+```{r unite2}
+DF2010 = DF2010 %>% select(-c(FRAC_lang, POL_lang))
+DF2015 = DF2015 %>% select(-c(FRAC_lang, POL_lang))
+
+true_names = c("year", "id", "region", "log_GRP","real_GRP", "FRAC_ethnic", "POL_ethnic", "FRAC_origin_reg", "POL_origin_reg", "FRAC_origin_country", "POL_origin_country", "density", "real_osn_kapital", "budget_share", "migration_change", "higher_educ_share", "years_educ", "active_share", "urban_share", "root_share", "tech_share", "tech_share_popul", "scientists_share", "instr_pollution", "instr_roads", "instr_house")
+
+# переставляем столбцы, чтобы сработал rbind
+DF2002 = DF2002 %>% select(true_names)
+DF2010 = DF2010 %>% select(true_names)
+DF2015 = DF2015 %>% select(true_names)
+
+
+df_full = rbind(DF2002, DF2010, DF2015)
+```
+
+
+```{r bad_regions}
+df_full = df_full %>% filter(region != "Чеченская Республика") %>% filter(region != "Республика Ингушетия") %>% arrange(region, year)
+
+df_full$real_GRP = df_full$real_GRP %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$log_GRP = df_full$log_GRP %>% str_replace_all(",", ".") %>% as.numeric()
+
+df_full$density = df_full$density %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$real_osn_kapital = df_full$real_osn_kapital %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$migration_change = df_full$migration_change %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$higher_educ_share = df_full$higher_educ_share %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$years_educ = df_full$years_educ %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$urban_share = df_full$urban_share %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$root_share = df_full$root_share %>% str_replace_all(",", ".") %>% as.numeric()
+df_full$scientists_share = df_full$scientists_share %>% str_replace_all(",", ".") %>% as.numeric()
+
+# df_full = df_full %>% select(-c(region))
+
+# sapply(df_full, function(x) sum(length(which(is.na(x)))))
+# lapply(df_full, function(x) df_full[["id"]][c(which(is.na(x)))])
+```
+
+```{r final_export}
+write_excel_csv2(df_full, "D:/HSE/3 курс/курсовая/final_df.csv", col_names = TRUE)
+foreign::write.dta(df_full, "D:/HSE/3 курс/курсовая/final_df.dta")
+```
+
+```{r year-dfs}
+df_02 = df_full %>% filter(year == 2002)
+foreign::write.dta(df_02, "D:/HSE/3 курс/курсовая/df_02.dta")
+
+df_10 = df_full %>% filter(year == 2010)
+foreign::write.dta(df_10, "D:/HSE/3 курс/курсовая/df_10.dta")
+
+df_15 = df_full %>% filter(year == 2015)
+foreign::write.dta(df_15, "D:/HSE/3 курс/курсовая/df_15.dta")
+
+
+df_02_10 = df_full %>% filter(year %in% c(2002, 2010))
+foreign::write.dta(df_02_10, "D:/HSE/3 курс/курсовая/df_02_10.dta")
+
+df_10_15 = df_full %>% filter(year %in% c(2010, 2015))
+foreign::write.dta(df_10_15, "D:/HSE/3 курс/курсовая/df_10_15.dta")
+```
+
+```{r bez_gorodov}
+foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург"), "D:/HSE/3 курс/курсовая/final_dfbez.dta")
+
+df_02bez = df_full %>% filter(year == 2002) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
+foreign::write.dta(df_02bez, "D:/HSE/3 курс/курсовая/df_02bez.dta")
+
+df_10bez = df_full %>% filter(year == 2010) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
+foreign::write.dta(df_10bez, "D:/HSE/3 курс/курсовая/df_10bez.dta")
+
+df_15bez = df_full %>% filter(year == 2015) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
+foreign::write.dta(df_15bez, "D:/HSE/3 курс/курсовая/df_15bez.dta")
+
+
+df_02_10bez = df_full %>% filter(year %in% c(2002, 2010)) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
+foreign::write.dta(df_02_10bez, "D:/HSE/3 курс/курсовая/df_02_10bez.dta")
+
+df_10_15bez = df_full %>% filter(year %in% c(2010, 2015)) %>% filter(region != "г. Москва" & region != "г. Санкт-Петербург")
+foreign::write.dta(df_10_15bez, "D:/HSE/3 курс/курсовая/df_10_15bez.dta")
+
+# для инструментов
+foreign::write.dta(filter(df_full, region != "г. Москва" & region != "г. Санкт-Петербург" & region != "Еврейская автономная область" & region != "Чукотский автономный округ"), "D:/HSE/3 курс/курсовая/final_df_instr.dta")
+```
+
+
+#### Описательные статистики
+
+```{r prepare_to_describe}
+DF2002_numeric = DF2002 %>% select(-c(region, id, year))
+DF2010_numeric = DF2010 %>% select(-c(region, id, year))
+DF2015_numeric = DF2015 %>% select(-c(region, id, year))
+```
+
+```{r description_table}
+# описательные статистики
+tab02 = psych::describe(DF2002_numeric, skew = T, IQR = T) %>% as.data.frame() %>% select(n, mean, median, sd, min, max)
+tab10 = psych::describe(DF2010_numeric, skew = T, IQR = T) %>% as.data.frame() %>% select(n, mean, median, sd, min, max)
+tab15 = psych::describe(DF2015_numeric, skew = T, IQR = T) %>% as.data.frame() %>% select(n, mean, median, sd, min, max)
+
+tab02$year = rep(2002, times=dim(tab02)[1])
+tab10$year = rep(2010, times=dim(tab10)[1])
+tab15$year = rep(2015, times=dim(tab15)[1])
+
+tab02$var = rownames(tab02)
+tab10$var = rownames(tab10)
+tab15$var = rownames(tab15)
+
+tab_full = rbind(tab02, tab10, tab15)
+rownames(tab_full) = NULL
+true_tab_names = c("var", "year", "n", "mean", "median", "sd", "min", "max")
+tab_full = tab_full %>% select(true_tab_names) %>% arrange(var, year)
+
+rm(tab02, tab10, tab15)
+```
+
+```{r description_tables}
+opis_index1 = tab_full[10:18,]
+opis_index2 = tab_full[37:45,]
+opis_index = rbind(opis_index1, opis_index2)
+
+opis_contr1 = tab_full[1:9,]
+opis_contr2 = tab_full[19:36,]
+opis_contr3 = tab_full[46:nrow(tab_full),]
+opis_contr = rbind(opis_contr1, opis_contr2, opis_contr3)
+
+rm(opis_index1, opis_index2, opis_contr1, opis_contr2, opis_contr3)
+```
+
+```{r corr1, include=FALSE}
+# корреляционная матрица, 1й вариант
+# DF2010_numeric$GDP_region = DF2010_numeric$GDP_region / 1000 # деление чисто для визуала
+# GGally::ggpairs(DF2015_numeric,
+                # progress = T, labeller = "label_parsed",
+                # diag = list(continuous = "blankDiag"),
+                # showStrips = T
+                # lower = "blank"
+                # )
+# ввп, пол и фрак все(кроме гражданства)
+```
+
+```{r corr2, include=FALSE}
+# корреляционная матрица, 2й вариант
+# col_pal <- colorRampPalette(c("red", "lightgreen", "blue"))
+# 
+# corrplot::corrplot(cor(DF2010_numeric),
+#          method = "number",
+#          col = col_pal(50),
+#          type = "upper",
+#          order = "FPC",
+#          tl.col = "black",
+#          diag = F)
+```
+
+```{r corr3, include=FALSE}
+# проверка на корреляцию
+# DF2010_numeric$GDP_region = DF2010_numeric$GDP_region / 1000 # деление чисто для визуала
+# GGally::ggpairs(DF2010_numeric,
+#                 progress = T, labeller = "label_parsed",
+#                 diag = list(continuous = "blankDiag")
+#                 # lower = "blank"
+#                 )
+```
+
+```{r func_of_corr}
+#' correlation_matrix
+#' Creates a publication-ready / formatted correlation matrix, using `Hmisc::rcorr` in the backend.
+#'
+#' @param df dataframe; containing numeric and/or logical columns to calculate correlations for
+#' @param type character; specifies the type of correlations to compute; gets passed to `Hmisc::rcorr`; options are `"pearson"` or `"spearman"`; defaults to `"pearson"`
+#' @param digits integer/double; number of decimals to show in the correlation matrix; gets passed to `formatC`; defaults to `3`
+#' @param decimal.mark character; which decimal.mark to use; gets passed to `formatC`; defaults to `.`
+#' @param use character; which part of the correlation matrix to display; options are `"all"`, `"upper"`, `"lower"`; defaults to `"all"`
+#' @param show_significance boolean; whether to add `*` to represent the significance levels for the correlations; defaults to `TRUE`
+#' @param replace_diagonal boolean; whether to replace the correlations on the diagonal; defaults to `FALSE`
+#' @param replacement character; what to replace the diagonal and/or upper/lower triangles with; defaults to `""` (empty string)
+#'
+#' @return a correlation matrix
+#' @export
+#'
+#' @examples
+#' `correlation_matrix(iris)`
+#' `correlation_matrix(mtcars)`
+correlation_matrix <- function(df, 
+                               type = "pearson",
+                               digits = 3, 
+                               decimal.mark = ".",
+                               use = "all", 
+                               show_significance = TRUE, 
+                               replace_diagonal = FALSE, 
+                               replacement = ""){
+  
+  # check arguments
+  stopifnot({
+    is.numeric(digits)
+    digits >= 0
+    use %in% c("all", "upper", "lower")
+    is.logical(replace_diagonal)
+    is.logical(show_significance)
+    is.character(replacement)
+  })
+  # we need the Hmisc package for this
+  require(Hmisc)
+  
+  # retain only numeric and boolean columns
+  isNumericOrBoolean = vapply(df, function(x) is.numeric(x) | is.logical(x), logical(1))
+  if (sum(!isNumericOrBoolean) > 0) {
+    cat('Dropping non-numeric/-boolean column(s):', paste(names(isNumericOrBoolean)[!isNumericOrBoolean], collapse = ', '), '\n\n')
+  }
+  df = df[isNumericOrBoolean]
+  
+  # transform input data frame to matrix
+  x <- as.matrix(df)
+  
+  # run correlation analysis using Hmisc package
+  correlation_matrix <- Hmisc::rcorr(x, type = )
+  R <- correlation_matrix$r # Matrix of correlation coeficients
+  p <- correlation_matrix$P # Matrix of p-value 
+  
+  # transform correlations to specific character format
+  Rformatted = formatC(R, format = 'f', digits = digits, decimal.mark = decimal.mark)
+  
+  # if there are any negative numbers, we want to put a space before the positives to align all
+  if (sum(R < 0) > 0) {
+    Rformatted = ifelse(R > 0, paste0(' ', Rformatted), Rformatted)
+  }
+  
+  # add significance levels if desired
+  if (show_significance) {
+    # define notions for significance levels; spacing is important.
+    stars <- ifelse(is.na(p), "   ", ifelse(p < .01, "***", ifelse(p < .05, "** ", ifelse(p < .1, "*  ", "   "))))
+    Rformatted = paste0(Rformatted, stars)
+  }
+  # build a new matrix that includes the formatted correlations and their significance stars
+  Rnew <- matrix(Rformatted, ncol = ncol(x))
+  rownames(Rnew) <- colnames(x)
+  colnames(Rnew) <- paste(colnames(x), "", sep =" ")
+  
+  # replace undesired values
+  if (use == 'upper') {
+    Rnew[lower.tri(Rnew, diag = replace_diagonal)] <- replacement
+  } else if (use == 'lower') {
+    Rnew[upper.tri(Rnew, diag = replace_diagonal)] <- replacement
+  } else if (replace_diagonal) {
+    diag(Rnew) <- replacement
+  }
+  
+  return(Rnew)
+}
+```
+
+```{r corr_df}
+df_indices02 = DF2002 %>% select(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country)
+df_indices10 = DF2010 %>% select(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country)
+df_indices15 = DF2015 %>% select(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country)
+
+df_contr02 = DF2002 %>% select(-c(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country, year, id, region))
+df_contr10 = DF2010 %>% select(-c(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country, year, id, region))
+df_contr15 = DF2015 %>% select(-c(FRAC_ethnic, POL_ethnic, FRAC_origin_reg, POL_origin_reg, FRAC_origin_country,  POL_origin_country, year, id, region))
+```
+
+```{r corr_matrix_explain}
+df_cor02 = correlation_matrix(df_indices02, digits=3)
+df_cor02[upper.tri(df_cor02, diag=F)] <- "" # делаем матрицу диагональной
+
+df_cor10 = correlation_matrix(df_indices10, digits=3)
+df_cor10[upper.tri(df_cor10, diag=F)] <- ""
+
+df_cor15 = correlation_matrix(df_indices15, digits=3)
+df_cor15[upper.tri(df_cor15, diag=F)] <- ""
+```
+
+```{r corr_matrix_contr}
+contr_cor02 = correlation_matrix(df_contr02, digits=3) %>% as.data.frame()
+
+contr_cor10 = correlation_matrix(df_contr10, digits=3) %>% as.data.frame()
+
+contr_cor15 = correlation_matrix(df_contr15, digits=3) %>% as.data.frame()
+```
+
+```{r corr_latex}
+print(xtable(df_cor15, align = c("l", rep("c", dim(df_cor15)[1])), digits = 3), tabular.environment = "tabular", booktabs = T)
+```
+
+
+#### Графики
+```{r theme}
+# соответствует wwidth = 900
+theme_adv = theme(plot.title = element_text(hjust = 0.5, size = 12),
+        plot.title.position = "plot",
+        plot.caption.position = "plot",
+        axis.title.x = element_text(size = 24),
+        axis.title.y = element_text(size = 24),
+        axis.text = element_text(size = 20),
+        panel.background = element_rect(fill = "white"),
+        panel.grid = element_line(color = "white"),
+        text=element_text(family="serif"))
+```
+
+```{r graph}
+# запускать весь чанк!
+wwidth = 900
+graph_path = "D:/HSE/3 курс/курсовая/графики/"
+
+png(filename=paste0(graph_path,"frac_pol_2015.png"), units = "px", width=wwidth, height=wwidth/(16/9))
+
+ggplot(df_indices15)+
+  geom_point(aes(x = POL_ethnic, y = FRAC_ethnic), colour = "#343434", size = 4.5, shape= 19)+
+  theme_adv+
+  labs(x = "Поляризация", y = "Фракционализация", title = NULL)+
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf), # рамка
+            colour = "black", size = 0.5, fill = NA)+
+  scale_x_continuous(breaks=c(0,0.2,0.4,0.6,0.8,1), labels=c("0",".2",".4",".6",".8","1"))+ 
+  scale_y_continuous(breaks=c(0,0.2,0.4,0.6,0.8,1), labels=c("0",".2",".4",".6",".8","1"))
+
+dev.off()
+
+# Альтернативный вариант (плохо работает)
+# ggsave(file="bench_query_sort.pdf", path = "D:/HSE/3 курс/курсовая/графики/", units = "px", width=wwidth, height=wwidth/(16/9), scale = 3, dpi=100)
+```
+
